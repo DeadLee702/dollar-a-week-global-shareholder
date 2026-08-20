@@ -53,7 +53,7 @@ export class ProtocolStateService {
   async canExecuteTreasury(transactionId: string) {
     const tx = await prisma.treasuryTransaction.findUnique({ where: { id: transactionId } });
     if (!tx) return { allowed: false, reason: 'Transaction not found' };
-    if (tx.status !== 'CUSTODY_APPROVED' && tx.status !== 'EXECUTION_AUTHORIZED') {
+    if (tx.status !== 'CUSTODY_APPROVED' && tx.status !== 'EXECUTION_AUTHORIZED' && tx.status !== 'PENDING') {
       return { allowed: false, reason: `Transaction status ${tx.status} does not allow execution` };
     }
     // Additional checks should be performed by treasury service: deployable capital, due diligence, disputes, expiration
@@ -78,5 +78,16 @@ export class ProtocolStateService {
     if (targetIndex <= currentIndex) return { allowed: false, reason: 'Can only progress forward in state order' };
     // Additional domain checks (e.g., land acquired before moving to next states) should be enforced elsewhere
     return { allowed: true };
+  }
+
+  async transitionSeedCell(seedCellId: string, targetState: string, performedBy: string | null, reason?: string) {
+    const can = await this.canTransitionSeedCell(seedCellId, targetState);
+    if (!can.allowed) throw new Error(`Cannot transition: ${can.reason}`);
+    const seed = await prisma.seedCell.findUnique({ where: { id: seedCellId } });
+    const previous = seed?.protocol_state || null;
+    await prisma.seedCell.update({ where: { id: seedCellId }, data: { protocol_state: targetState } });
+    await prisma.protocolStateLog.create({ data: { seed_cell_id: seedCellId, previous_state: previous, new_state: targetState, performed_by: performedBy || null, reason: reason || null } });
+    await prisma.auditLog.create({ data: { actor_id: performedBy || null, action: 'transition_seedcell', entity_type: 'seed_cell', entity_id: seedCellId, previous_state: previous, new_state: targetState } as any });
+    return { ok: true };
   }
 }
