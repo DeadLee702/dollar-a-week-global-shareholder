@@ -1,274 +1,51 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model User {
-  id            String   @id @default(uuid())
-  auth_user_id  String   @unique
-  display_name  String?
-  preferred_language String? @default("en")
-  preferred_currency String? @default("USD")
-  timezone      String?
-  status        String   @default("PENDING_REVIEW")
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
-
-  memberVerifications MemberVerification[]
-  seedCellMembers SeedCellMember[]
-  contributions Contribution[] @relation("member_contributions")
-  proposals Proposal[] @relation("user_proposals")
-  votes Vote[]
-}
-
-model MemberVerification {
-  id String @id @default(uuid())
-  user_id String
-  verification_status String
-  uniqueness_attestation_reference String?
-  verification_method String?
-  verification_provider String?
-  verified_at DateTime?
-  revoked_at DateTime?
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  user User @relation(fields: [user_id], references: [id])
-}
-
-model SeedCell {
-  id String @id @default(uuid())
-  name String
-  region String?
-  country_code String?
-  local_currency String?
-  status String @default("FORMING")
-  protocol_state String @default("STATE_1_ACCUMULATION")
-  target_members Int @default(10000)
-  current_members Int @default(0)
-  weekly_target Float? @default(0)
-  annual_target Float? @default(0)
-  gross_contributions Float? @default(0)
-  reserves Float? @default(0)
-  restricted_capital Float? @default(0)
-  committed_capital Float? @default(0)
-  deployable_capital Float? @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  members SeedCellMember[]
-  proposals Proposal[]
-  projects Project[]
-}
-
-model SeedCellMember {
+model Custodian {
   id String @id @default(uuid())
   seed_cell_id String
-  user_id String
-  membership_status String @default("PENDING")
-  joined_at DateTime?
-  voting_eligible Boolean @default(false)
-  verification_status String?
-  contribution_status String?
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  seedCell SeedCell @relation(fields: [seed_cell_id], references: [id])
-  user User @relation(fields: [user_id], references: [id])
-  contributions Contribution[]
-  votes Vote[]
-}
-
-model Contribution {
-  id String @id @default(uuid())
-  seed_cell_id String
-  member_id String
-  amount Float
-  currency String
-  usd_equivalent Float
-  contribution_week DateTime
-  payment_provider String
-  payment_reference String
-  payment_status String
-  settled_at DateTime?
+  user_id String?
+  display_name String?
+  status String @default("ACTIVE")
   created_at DateTime @default(now())
 
   seedCell SeedCell @relation(fields: [seed_cell_id], references: [id])
-  member SeedCellMember @relation(fields: [member_id], references: [id])
 }
 
-model FinancialEvent {
-  id String @id @default(uuid())
-  timestamp DateTime @default(now())
-  seed_cell_id String
-  event_type String
-  amount Float
-  currency String
-  usd_equivalent Float
-  source String?
-  destination String?
-  related_proposal String?
-  related_transaction String?
-  actor String?
-  verification_status String?
-  cryptographic_hash String?
-}
-
-model TreasuryAccount {
-  id String @id @default(uuid())
-  seed_cell_id String
-  gross_balance Float @default(0)
-  reserved_balance Float @default(0)
-  restricted_balance Float @default(0)
-  committed_balance Float @default(0)
-  deployable_balance Float @default(0)
-  pending_balance Float @default(0)
-  currency String
-  updated_at DateTime @updatedAt
-}
-
-model TreasuryTransaction {
-  id String @id @default(uuid())
-  seed_cell_id String
-  proposal_id String?
-  amount Float
-  currency String
-  destination String
-  transaction_type String
-  status String @default("PENDING")
-  required_signatures Int @default(0)
-  collected_signatures Int @default(0)
-  governance_approval_reference String?
-  execution_reference String?
-  created_at DateTime @default(now())
-  executed_at DateTime?
-  failed_at DateTime?
-  cancelled_at DateTime?
-}
-
-model TreasurySignature {
-  id String @id @default(uuid())
-  transaction_id String
-  custodian_id String
-  signature_reference String?
-  signature_timestamp DateTime?
-  signature_status String
-  verification_reference String?
-  created_at DateTime @default(now())
-}
-
-model ProtocolVersion {
-  id String @id @default(uuid())
-  version_number String
-  title String
-  description String?
-  effective_date DateTime?
-  status String
-  proposal_id String?
-  approved_at DateTime?
-  created_at DateTime @default(now())
-}
-
-model Notification {
-  id String @id @default(uuid())
-  user_id String
-  type String
-  title String
-  message String
-  related_entity_type String?
-  related_entity_id String?
-  read_at DateTime?
-  created_at DateTime @default(now())
-}
-
-model AuditLog {
-  id String @id @default(uuid())
-  actor_id String?
-  action String
-  entity_type String
-  entity_id String?
-  previous_state String?
-  new_state String?
-  timestamp DateTime @default(now())
-  ip_metadata String?
-  verification_reference String?
-}
-
-model Proposal {
-  id String @id @default(uuid())
-  seed_cell_id String
-  proposer_id String
-  title String
-  description String?
-  requested_amount Float?
-  status String @default("PROPOSED")
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  seedCell SeedCell @relation(fields: [seed_cell_id], references: [id])
-  proposer User @relation("user_proposals", fields: [proposer_id], references: [id])
-  votes Vote[]
-  project Project[]
-}
-
-model Vote {
+model DueDiligence {
   id String @id @default(uuid())
   proposal_id String
-  user_id String
-  seed_cell_member_id String
-  choice String
+  seed_cell_id String
+  uploader_id String?
+  file_reference String?
+  file_hash String?
+  file_size BigInt?
+  mime_type String?
+  verified Boolean @default(false)
+  verified_by String?
+  verified_at DateTime?
   created_at DateTime @default(now())
-
-  proposal Proposal @relation(fields: [proposal_id], references: [id])
-  user User @relation(fields: [user_id], references: [id])
-  member SeedCellMember @relation(fields: [seed_cell_member_id], references: [id])
-
-  @@unique([proposal_id, user_id])
 }
 
-model Project {
+model LandAcquisition {
   id String @id @default(uuid())
+  proposal_id String
   seed_cell_id String
-  proposal_id String?
-  project_type String?
-  name String?
-  description String?
-  status String @default("PROPOSED")
-  budget Float?
-  actual_cost Float?
-  completion_percentage Int @default(0)
-  start_date DateTime?
-  estimated_completion_date DateTime?
-  actual_completion_date DateTime?
+  location_description String?
+  acreage Float?
+  purchase_price Float?
+  vendor_info String?
+  status String @default("DUE_DILIGENCE")
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
   seedCell SeedCell @relation(fields: [seed_cell_id], references: [id])
-  proposal Proposal? @relation(fields: [proposal_id], references: [id])
-  milestones ProjectMilestone[]
+  proposal Proposal @relation(fields: [proposal_id], references: [id])
 }
 
-model ProjectMilestone {
+model ResourceLedger {
   id String @id @default(uuid())
-  project_id String
-  name String?
+  seed_cell_id String
+  asset_type String
+  asset_reference String?
   description String?
-  target_date DateTime?
-  completed_at DateTime?
-  verification_status String?
-  verified_by String?
-  evidence_reference String?
-
-  project Project @relation(fields: [project_id], references: [id])
-}
-
-model IdempotencyKey {
-  id String @id @default(uuid())
-  key String @unique
-  created_at DateTime @default(now())
-  used Boolean @default(false)
+  recorded_at DateTime @default(now())
+  metadata Json?
 }
