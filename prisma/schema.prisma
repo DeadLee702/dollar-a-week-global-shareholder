@@ -1,51 +1,41 @@
-model Custodian {
+model ProtocolStateLog {
   id String @id @default(uuid())
   seed_cell_id String
-  user_id String?
-  display_name String?
-  status String @default("ACTIVE")
+  previous_state String?
+  new_state String
+  reason String?
+  performed_by String?
   created_at DateTime @default(now())
 
   seedCell SeedCell @relation(fields: [seed_cell_id], references: [id])
 }
 
-model DueDiligence {
+model InfrastructureAsset {
   id String @id @default(uuid())
-  proposal_id String
   seed_cell_id String
-  uploader_id String?
-  file_reference String?
-  file_hash String?
-  file_size BigInt?
-  mime_type String?
-  verified Boolean @default(false)
-  verified_by String?
-  verified_at DateTime?
-  created_at DateTime @default(now())
-}
-
-model LandAcquisition {
-  id String @id @default(uuid())
-  proposal_id String
-  seed_cell_id String
-  location_description String?
-  acreage Float?
-  purchase_price Float?
-  vendor_info String?
-  status String @default("DUE_DILIGENCE")
+  project_id String?
+  asset_type String
+  asset_reference String?
+  capacity Json?
+  commissioning_date DateTime?
+  status String @default("PROPOSED")
+  metadata Json?
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
   seedCell SeedCell @relation(fields: [seed_cell_id], references: [id])
-  proposal Proposal @relation(fields: [proposal_id], references: [id])
+  project Project? @relation(fields: [project_id], references: [id])
 }
 
-model ResourceLedger {
+model ResourceNetwork {
   id String @id @default(uuid())
   seed_cell_id String
-  asset_type String
-  asset_reference String?
+  name String?
   description String?
-  recorded_at DateTime @default(now())
+  status String @default("PLANNED")
   metadata Json?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  seedCell SeedCell @relation(fields: [seed_cell_id], references: [id])
 }
