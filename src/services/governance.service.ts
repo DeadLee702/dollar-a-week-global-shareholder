@@ -7,28 +7,40 @@ export class GovernanceService {
   constructor(private readonly protocolState: ProtocolStateService) {}
 
   async createProposal(data: any) {
-    // Minimal proposal structure: { seed_cell_id, proposer_id, title, description, requested_amount }
     const { seed_cell_id, proposer_id, title, description, requested_amount } = data;
     if (!seed_cell_id || !proposer_id || !title) throw new Error('Missing fields');
 
-    // check permission to create proposal
-    const seed = await prisma.seedCell.findUnique({ where: { id: seed_cell_id } });
-    if (!seed) throw new Error('Seed Cell not found');
+    // Confirm proposer is an active member of the seed cell
+    const member = await prisma.seedCellMember.findFirst({ where: { seed_cell_id, user_id: proposer_id, membership_status: 'ACTIVE' } });
+    if (!member) throw new Error('Proposer must be an active member of the Seed Cell');
 
-    // create proposal as a project placeholder in protocol
-    const proposal = await prisma.$executeRaw`-- proposals table not yet created; placeholder`;
-    // For now, record an audit log
-    await prisma.auditLog.create({ data: { actor_id: proposer_id, action: 'create_proposal', entity_type: 'proposal', new_state: 'PROPOSED' } });
-    return { message: 'Proposal creation placeholder — implement proposals table', seed_cell_id, title };
+    // Create proposal
+    const proposal = await prisma.proposal.create({ data: { seed_cell_id, proposer_id, title, description, requested_amount: requested_amount || null, status: 'PROPOSED' } });
+
+    await prisma.auditLog.create({ data: { actor_id: proposer_id, action: 'create_proposal', entity_type: 'proposal', entity_id: proposal.id, new_state: 'PROPOSED' } });
+
+    return proposal;
   }
 
   async castVote(data: any) {
-    const { proposal_id, user_id, vote } = data;
-    if (!proposal_id || !user_id || !vote) throw new Error('Missing fields');
+    const { proposal_id, user_id, choice } = data;
+    if (!proposal_id || !user_id || !choice) throw new Error('Missing fields');
+
     const can = await this.protocolState.canVote(user_id, proposal_id);
     if (!can.allowed) throw new Error(`Cannot vote: ${can.reason}`);
-    // Placeholder: actual vote storage requires proposals & votes tables. Log the action.
-    await prisma.auditLog.create({ data: { actor_id: user_id, action: 'cast_vote', entity_type: 'proposal', entity_id: proposal_id, new_state: vote } });
-    return { message: 'Vote recorded (audit log). Implement votes table for aggregation.' };
+
+    // Create vote record
+    try {
+      const member = await prisma.seedCellMember.findFirst({ where: { user_id, seed_cell_id: (await prisma.proposal.findUnique({ where: { id: proposal_id } })).seed_cell_id, membership_status: 'ACTIVE' } });
+      const vote = await prisma.vote.create({ data: { proposal_id, user_id, seed_cell_member_id: member!.id, choice } });
+      await prisma.auditLog.create({ data: { actor_id: user_id, action: 'cast_vote', entity_type: 'proposal', entity_id: proposal_id, new_state: choice } });
+      return vote;
+    } catch (err: any) {
+      // Propagate clear error messages
+      if (err.code === 'P2002' || err.message?.includes('duplicate')) {
+        throw new Error('Duplicate vote detected');
+      }
+      throw err;
+    }
   }
 }
