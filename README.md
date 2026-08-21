@@ -1,4 +1,4 @@
-🌍 The 10-Cent Initiative
+🌍 THE 10-CENT INITIATIVE
 
 A Global Initiative
 
